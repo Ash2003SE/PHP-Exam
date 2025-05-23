@@ -1,23 +1,28 @@
 <?php
-require_once 'config/db.php';
-require_once 'classes/Encryption.php';
+// File: Classes/PasswordStorage.php
+namespace Classes;
+
+use PDO;
+use Config\Database;
+
+require_once __DIR__ . '/../Config/Database.php';
+require_once __DIR__ . '/Encryption.php';
 
 class PasswordStorage {
-    private $conn;
+    private $pdo;
 
     public function __construct() {
-        $this->conn = Database::connect();
+        $this->pdo = Database::getPDO();
     }
 
     public function savePassword($userId, $service, $password, $userPlainPassword) {
         $encryptedPassword = Encryption::encrypt($password, $userPlainPassword);
-
-        $stmt = $this->conn->prepare("INSERT INTO saved_passwords (user_id, service_name, password_encrypted) VALUES (?, ?, ?)");
+        $stmt = $this->pdo->prepare("INSERT INTO saved_passwords (user_id, service_name, password_encrypted, created_at) VALUES (?, ?, ?, NOW())");
         return $stmt->execute([$userId, $service, $encryptedPassword]);
     }
 
     public function getPasswords($userId, $userPlainPassword) {
-        $stmt = $this->conn->prepare("SELECT service_name, password_encrypted, created_at FROM saved_passwords WHERE user_id = ?");
+        $stmt = $this->pdo->prepare("SELECT service_name, password_encrypted, created_at FROM saved_passwords WHERE user_id = ?");
         $stmt->execute([$userId]);
 
         $results = [];

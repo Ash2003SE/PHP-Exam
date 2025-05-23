@@ -1,22 +1,46 @@
 <?php
-class Encryption {
-    private const CIPHER = 'AES-256-CBC';
+// File: Classes/User.php
+namespace Classes;
 
-    public static function encrypt($data, $password) {
-        $key = hash('sha256', $password, true); // 256-bit key
-        $iv = openssl_random_pseudo_bytes(16);  // 128-bit IV
+use PDO;
+use Config\Database;
+require_once __DIR__ . '/../Config/Database.php';
+require_once __DIR__ . '/Encryption.php';
 
-        $encrypted = openssl_encrypt($data, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv);
-        return base64_encode($iv . $encrypted); // Save IV + encrypted data
+class User {
+    private $pdo;
+
+    public function __construct() {
+        $this->pdo = Database::getPDO();
     }
 
-    public static function decrypt($data, $password) {
-        $key = hash('sha256', $password, true);
-        $data = base64_decode($data);
+    public function register($username, $password) {
+        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE username = ?");
+        $stmt->execute([$username]);
 
-        $iv = substr($data, 0, 16);           // Extract IV
-        $encrypted = substr($data, 16);
+        if ($stmt->fetch()) {
+            return ["success" => false, "message" => "Username already taken."];
+        }
 
-        return openssl_decrypt($encrypted, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv);
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        $encryptionKey = Encryption::encrypt(bin2hex(random_bytes(32)), $password);
+
+        $stmt = $this->pdo->prepare("INSERT INTO users (username, password, encryption_key) VALUES (?, ?, ?)");
+        $stmt->execute([$username, $hashedPassword, $encryptionKey]);
+
+        return ["success" => true, "message" => "Registration successful."];
+    }
+
+    public function login($username, $password) {
+        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE username = ?");
+        $stmt->execute([$username]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && password_verify($password, $user['password'])) {
+            $user['encryption_key'] = Encryption::decrypt($user['encryption_key'], $password);
+            return $user;
+        }
+
+        return false;
     }
 }

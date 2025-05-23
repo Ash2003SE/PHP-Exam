@@ -1,4 +1,6 @@
 <?php
+namespace Classes;
+
 class PasswordGenerator {
     public static function generate($length, $uppercase, $lowercase, $numbers, $specials) {
         $upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
